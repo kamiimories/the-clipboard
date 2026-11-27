@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clipboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ["Inter","sans-serif"], display: ["Outfit","sans-serif"] },
+        colors: {
+          cream: {50:"#FDFBF7",100:"#F8F4EC",200:"#EFE8D8"},
+          lavender: {50:"#F7F5FF",100:"#EFEBFF",200:"#DFD7FF",500:"#8B7AE8",600:"#725EE0",700:"#5A46C7"},
+          peach: {50:"#FFF6F3",100:"#FFECE5",200:"#FFD6C7",500:"#F27D61",600:"#E06346"},
+          sage: {50:"#F3FAF6",100:"#E5F5EC",200:"#C8EBD8",600:"#358562",700:"#27684B"},
+        },
+        boxShadow: { soft:"0 10px 30px -10px rgba(38,34,62,0.08)", tactile:"0 4px 0 0 rgba(30,27,46,0.14)", "tactile-primary":"0 4px 0 0 #533EC2", "tactile-sage":"0 4px 0 0 #1E543D" }
+      }}
+    };
+  </script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="min-h-screen antialiased pb-12">
+  <div id="toast" class="hidden fixed bottom-4 right-4 z-[70] max-w-sm rounded-2xl bg-slate-900 text-white px-4 py-3 shadow-lg text-sm font-semibold whitespace-pre-line"></div>
+  <datalist id="pdfList"></datalist>
+
+  <!-- Ship qty modal -->
+  <div id="shipModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div class="glass-card w-full max-w-md rounded-3xl p-6 border border-lavender-200/70">
+      <h3 id="shipTitle" class="font-display font-extrabold text-xl mb-1">Ship to queue</h3>
+      <p id="shipSub" class="text-sm text-slate-500 mb-3"></p>
+      <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">Qty moving</label>
+      <input id="shipQty" type="number" min="1" class="w-full px-3 py-2 rounded-xl border text-sm mb-4" />
+      <div class="flex justify-end gap-2">
+        <button onclick="closeShip()" class="btn-trendy px-4 py-2 rounded-xl text-sm font-bold bg-white border">Cancel</button>
+        <button onclick="confirmShip()" class="btn-trendy px-4 py-2 rounded-xl text-sm font-bold bg-sage-600 text-white">Move to queue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrap modal -->
+  <div id="scrapModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div class="glass-card w-full max-w-md rounded-3xl p-6 border border-lavender-200/70">
+      <h3 id="scrapTitle" class="font-display font-extrabold text-xl mb-1">Scrap</h3>
+      <p id="scrapSub" class="text-sm text-slate-500 mb-3"></p>
+      <div class="flex gap-2 mb-2">
+        <input id="scrapQty" type="number" min="1" value="1" class="w-20 px-3 py-2 rounded-xl border text-sm" />
+        <select id="scrapType" class="flex-1 px-3 py-2 rounded-xl border text-sm">
+          <option>dmg on rcv</option><option>pinhole</option><option>line</option><option>steel</option>
+          <option>thick</option><option>dent</option><option>crease</option><option>short</option>
+        </select>
+        <button onclick="addScrapLine()" class="btn-trendy px-3 py-2 rounded-xl text-sm font-bold bg-lavender-600 text-white">Add</button>
+      </div>
+      <div id="scrapLines" class="text-sm space-y-1 mb-3 min-h-[2rem]"></div>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeScrap()" class="btn-trendy px-4 py-2 rounded-xl text-sm font-bold bg-white border">Cancel</button>
+        <button onclick="applyScrap()" class="btn-trendy px-4 py-2 rounded-xl text-sm font-bold bg-rose-600 text-white">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOL export modal -->
+  <div id="bolModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+    <div class="glass-card w-full max-w-md rounded-3xl p-6 border border-lavender-200/70">
+      <h3 class="font-display font-extrabold text-xl mb-3">Export to Dock (BOL files)</h3>
+      <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">Wolfsteel BOL #</label>
+      <input id="bolWS" type="text" class="w-full px-3 py-2 rounded-xl border text-sm mb-3" placeholder="required if Wolfsteel in queue" />
+      <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">NAC BOL #</label>
+      <input id="bolNAC" type="text" class="w-full px-3 py-2 rounded-xl border text-sm mb-4" placeholder="required if NAC in queue" />
+      <div class="flex justify-end gap-2">
+        <button onclick="closeBolExport()" class="btn-trendy px-4 py-2 rounded-xl text-sm font-bold bg-white border">Cancel</button>
+        <button onclick="exportBol()" class="btn-trendy px-4 py-2 rounded-xl text-sm font-bold bg-sage-600 text-white">Export</button>
+      </div>
+    </div>
+  </div>
+
+  <header class="sticky top-0 z-30 glass-card border-b border-lavender-200/70 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-peach-500 to-lavender-600 flex items-center justify-center text-white">
+          <i data-lucide="clipboard-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display font-extrabold text-2xl text-slate-900">Clipboard</h1>
+            <span class="suite-badge bg-peach-100 text-peach-700 border border-peach-200">Floor</span>
+          </div>
+          <p class="text-xs text-slate-500">Load Bruno lists · scrap · queue · export BOL to Dock</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <button id="undoBtn" onclick="undo()" disabled class="btn-trendy px-3 py-2 rounded-xl text-xs font-bold bg-white border">Undo</button>
+        <button onclick="setOrdersFolder()" class="btn-trendy px-3 py-2 rounded-xl text-xs font-bold bg-lavender-100 text-lavender-700 border border-lavender-200">Orders Folder</button>
+        <button onclick="loadNewOrders()" class="btn-trendy px-3 py-2 rounded-xl text-xs font-bold bg-lavender-600 text-white">Add New Orders</button>
+        <button onclick="setDockFolder()" class="btn-trendy px-3 py-2 rounded-xl text-xs font-bold bg-sage-100 text-sage-700 border">Dock Folder</button>
+        <button onclick="setPdfFolder()" class="btn-trendy px-3 py-2 rounded-xl text-xs font-bold bg-white border">PDF Folder</button>
+        <button onclick="openTodo()" class="btn-trendy px-3 py-2 rounded-xl text-xs font-bold bg-white border">To-Do</button>
+        <span id="status" class="text-xs text-slate-400"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 mt-6 space-y-6">
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="glass-card rounded-2xl p-4 border"><p class="text-[11px] font-bold uppercase text-slate-400">Ongoing</p><p id="sOpen" class="font-display font-extrabold text-3xl">0</p></div>
+      <div class="glass-card rounded-2xl p-4 border"><p class="text-[11px] font-bold uppercase text-slate-400">Overdue</p><p id="sOver" class="font-display font-extrabold text-3xl text-rose-600">0</p></div>
+      <div class="glass-card rounded-2xl p-4 border"><p class="text-[11px] font-bold uppercase text-slate-400">Queue</p><p id="sQueue" class="font-display font-extrabold text-3xl text-indigo-600">0</p></div>
+      <div class="glass-card rounded-2xl p-4 border"><p class="text-[11px] font-bold uppercase text-slate-400">With scrap</p><p id="sScrap" class="font-display font-extrabold text-3xl text-amber-600">0</p></div>
+    </section>
+
+    <section class="glass-card rounded-2xl border overflow-hidden">
+      <div class="px-5 py-4 border-b border-cream-200/80"><h2 class="font-display font-bold text-lg">Ongoing</h2>
+        <p class="text-xs text-slate-400">Qty shows remaining / original total · scrap is recorded by type · QC hides from To-Do</p>
+      </div>
+      <div class="overflow-x-auto px-3 pb-3">
+        <table class="tracker-table">
+          <thead><tr><th>Pri</th><th>QC</th><th>Due</th><th>Qty</th><th>Part #</th><th>Desig.</th><th>PO</th><th>Scrap</th><th></th><th></th><th></th></tr></thead>
+          <tbody id="ongoingTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="glass-card rounded-2xl border border-amber-200/50 overflow-hidden">
+      <div class="px-5 py-4 border-b border-cream-200/80 flex flex-wrap justify-between gap-2">
+        <h2 class="font-display font-bold text-lg">Shipping Queue</h2>
+        <button onclick="openBolExport()" class="btn-trendy px-3 py-1.5 rounded-xl text-xs font-bold bg-sage-600 text-white">Export to BoL</button>
+      </div>
+      <div class="overflow-x-auto px-3 pb-3">
+        <table class="tracker-table">
+          <thead><tr><th>Due</th><th>Desig.</th><th>Part #</th><th>Qty</th><th>PO</th><th></th></tr></thead>
+          <tbody id="queueTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
